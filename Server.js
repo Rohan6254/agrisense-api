@@ -200,8 +200,12 @@ app.post("/notify", (req, res) => {
 
 app.get("/health", (_req, res) => res.json({ ok: true, requests: requests.size }));
 
-app.get('/debug', (req, res) => {
-  res.json({ serviceRequests, bookings });
+app.get("/debug", (_req, res) => {
+  res.json({ 
+    total: requests.size, 
+    serviceRequests: Object.fromEntries(requests), 
+    bookings: Object.fromEntries(bookings) 
+  });
 });
 
 app.listen(PORT, () => console.log(`AgriSense mock API on port ${PORT}`));
