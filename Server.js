@@ -128,7 +128,7 @@ app.post("/service-requests", (req, res) => {
   };
   requests.set(record.request_id, record);
   console.log("[new request]", record.request_id, record.equipment, "-", record.issue, `(${zip})`);
-  res.status(201).json({ request_id: record.request_id, status: record.status, message: statusMessage(record) });
+  res.status(200).json({ request_id: record.request_id, status: record.status, message: statusMessage(record) });
 });
 
 app.get("/service-requests/:id", (req, res) => {
@@ -189,7 +189,7 @@ app.post("/bookings", (req, res) => {
   r.booking = booking;
   r.status = "CONFIRMED";
   r.updated_at = new Date().toISOString();
-  res.status(201).json(booking);
+  res.status(200).json(booking);
 });
 
 app.post("/notify", (req, res) => {
