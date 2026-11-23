@@ -128,7 +128,7 @@ app.post("/service-requests", (req, res) => {
   };
   requests.set(record.request_id, record);
   console.log("[new request]", record.request_id, record.equipment, "-", record.issue, `(${zip})`);
-  res.status(200).json({ request_id: record.request_id, status: record.status, message: statusMessage(record) });
+  res.status(201).json({ request_id: record.request_id, status: record.status, message: statusMessage(record) });
 });
 
 app.get("/service-requests/:id", (req, res) => {
@@ -189,7 +189,7 @@ app.post("/bookings", (req, res) => {
   r.booking = booking;
   r.status = "CONFIRMED";
   r.updated_at = new Date().toISOString();
-  res.status(200).json(booking);
+  res.status(201).json(booking);
 });
 
 app.post("/notify", (req, res) => {
@@ -198,14 +198,53 @@ app.post("/notify", (req, res) => {
   res.json({ sent: true, channel: "sms_mock" });
 });
 
+
+// ---------- equipment catalog (cards in chat) ----------
+// GET /equipment?type=tractor|truck|combine|sprayer|atv&max_price=60000
+// Replace the "image" URLs with your own real photos if any fail to load.
+const EQUIPMENT = [
+  { id: "EQ-1", type: "tractor", name: "John Deere 5075E", price: 38500, hp: 75, use: "Mid-size farms, mowing and hauling",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/John_Deere_5075E.jpg?width=500" },
+  { id: "EQ-2", type: "tractor", name: "Kubota M7060", price: 52900, hp: 70, use: "Row crops and loader work",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Kubota_M7060.jpg?width=500" },
+  { id: "EQ-3", type: "truck", name: "Ford F-250 Super Duty", price: 46800, hp: 385, use: "Hauling feed, trailers and tools",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Ford_F-250_Super_Duty.jpg?width=500" },
+  { id: "EQ-4", type: "truck", name: "Ram 2500 Heavy Duty", price: 49200, hp: 370, use: "Heavy loads and rough farm roads",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Ram_2500_Heavy_Duty.jpg?width=500" },
+  { id: "EQ-5", type: "combine", name: "Case IH Axial-Flow 5150", price: 410000, hp: 330, use: "Harvesting corn and soybeans",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Case_IH_Axial-Flow_combine.jpg?width=500" },
+  { id: "EQ-6", type: "sprayer", name: "John Deere 612R Sprayer", price: 285000, hp: 300, use: "Crop spraying across large fields",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/John_Deere_self-propelled_sprayer.jpg?width=500" },
+  { id: "EQ-7", type: "atv", name: "Polaris Ranger 1000", price: 17999, hp: 82, use: "Fast field checks and fence work",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Polaris_Ranger.jpg?width=500" },
+];
+
+app.get("/equipment", (req, res) => {
+  const type = String(req.query.type || "").toLowerCase();
+  const max = Number(req.query.max_price) || Infinity;
+  const list = EQUIPMENT.filter((e) => (!type || type === "any" || e.type === type) && e.price <= max);
+  const money = (n) => "$" + n.toLocaleString("en-US");
+  // "items" are already in card shape, so the agent can show them as a carousel.
+  res.json({
+    count: list.length,
+    summary: list.length
+      ? `I found ${list.length} ${type && type !== "any" ? type : "equipment"} option${list.length > 1 ? "s" : ""}, from ${money(Math.min(...list.map((e) => e.price)))} to ${money(Math.max(...list.map((e) => e.price)))}.`
+      : "I couldn't find equipment matching that. Try a different type or budget.",
+    items: list.map((e) => ({
+      id: e.id,
+      title: e.name,
+      subtitle: `${money(e.price)} - ${e.hp} HP - ${e.use}`,
+      image: e.image,
+    })),
+  });
+});
+
 app.get("/health", (_req, res) => res.json({ ok: true, requests: requests.size }));
 
+// View all stored data in browser
 app.get("/debug", (_req, res) => {
-  res.json({ 
-    total: requests.size, 
-    serviceRequests: Object.fromEntries(requests), 
-    bookings: Object.fromEntries(bookings) 
-  });
+  const allRequests = Object.fromEntries(requests);
+  res.json({ total: requests.size, serviceRequests: allRequests, bookings });
 });
 
 app.listen(PORT, () => console.log(`AgriSense mock API on port ${PORT}`));
