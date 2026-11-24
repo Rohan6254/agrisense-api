@@ -15,6 +15,11 @@
 const express = require("express");
 const app = express();
 app.use(express.json());
+app.set("trust proxy", true);
+const path = require("path");
+const fs = require("fs");
+const IMG_DIR = path.join(__dirname, "public", "images");
+app.use("/images", express.static(IMG_DIR, { maxAge: "7d" }));
 
 const PORT = process.env.PORT || 3000;
 
@@ -201,22 +206,29 @@ app.post("/notify", (req, res) => {
 
 // ---------- equipment catalog (cards in chat) ----------
 // GET /equipment?type=tractor|truck|combine|sprayer|atv&max_price=60000
-// Replace the "image" URLs with your own real photos if any fail to load.
+// Photos: paste a direct image link in "image" (easiest), OR put a file named like "photo" (e.g. ford-f250.jpg) in mock-api/public/images/.
 const EQUIPMENT = [
   { id: "EQ-1", type: "tractor", name: "John Deere 5075E", price: 38500, hp: 75, use: "Mid-size farms, mowing and hauling",
-    image: "https://commons.wikimedia.org/wiki/Special:FilePath/John_Deere_5075E.jpg?width=500" },
-  { id: "EQ-2", type: "tractor", name: "Kubota M7060", price: 52900, hp: 70, use: "Row crops and loader work",
-    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Kubota_M7060.jpg?width=500" },
+    photo: "john-deere-5075e",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Maimarkt_Mannheim_2015_-_John_Deere_5075E.JPG?width=500" },
+  { id: "EQ-2", type: "tractor", name: "Kubota Loader Tractor", price: 52900, hp: 70, use: "Row crops and loader work",
+    photo: "kubota-m7060",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Kubota_tractor_with_front_loader_and_backhoe.jpg?width=500" },
   { id: "EQ-3", type: "truck", name: "Ford F-250 Super Duty", price: 46800, hp: 385, use: "Hauling feed, trailers and tools",
-    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Ford_F-250_Super_Duty.jpg?width=500" },
-  { id: "EQ-4", type: "truck", name: "Ram 2500 Heavy Duty", price: 49200, hp: 370, use: "Heavy loads and rough farm roads",
-    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Ram_2500_Heavy_Duty.jpg?width=500" },
-  { id: "EQ-5", type: "combine", name: "Case IH Axial-Flow 5150", price: 410000, hp: 330, use: "Harvesting corn and soybeans",
-    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Case_IH_Axial-Flow_combine.jpg?width=500" },
-  { id: "EQ-6", type: "sprayer", name: "John Deere 612R Sprayer", price: 285000, hp: 300, use: "Crop spraying across large fields",
-    image: "https://commons.wikimedia.org/wiki/Special:FilePath/John_Deere_self-propelled_sprayer.jpg?width=500" },
-  { id: "EQ-7", type: "atv", name: "Polaris Ranger 1000", price: 17999, hp: 82, use: "Fast field checks and fence work",
-    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Polaris_Ranger.jpg?width=500" },
+    photo: "ford-f250",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Ford_F-250_Crew_Cab_P558_Super_Duty_PowerStroke.jpg?width=500" },
+  { id: "EQ-4", type: "truck", name: "Dodge Ram 2500 Heavy Duty", price: 49200, hp: 370, use: "Heavy loads and rough farm roads",
+    photo: "ram-2500",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Dodge_Ram_2500_Heavy_Duty.jpg?width=500" },
+  { id: "EQ-5", type: "combine", name: "Case IH AFX8010 Combine", price: 410000, hp: 330, use: "Harvesting corn and soybeans",
+    photo: "case-ih-axial-flow",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Case_IH_AFX8010_combine_harvester_1.jpg?width=500" },
+  { id: "EQ-6", type: "sprayer", name: "John Deere 4630 Sprayer", price: 285000, hp: 300, use: "Crop spraying across large fields",
+    photo: "john-deere-sprayer",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/John_Deere_4630_Self-Propelled_Sprayer_(16269461688).jpg?width=500" },
+  { id: "EQ-7", type: "atv", name: "Polaris Ranger XP 700", price: 17999, hp: 82, use: "Fast field checks and fence work",
+    photo: "polaris-ranger",
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Polaris_Ranger_XP_700.jpg?width=500" },
 ];
 
 app.get("/equipment", (req, res) => {
@@ -224,6 +236,13 @@ app.get("/equipment", (req, res) => {
   const max = Number(req.query.max_price) || Infinity;
   const list = EQUIPMENT.filter((e) => (!type || type === "any" || e.type === type) && e.price <= max);
   const money = (n) => "$" + n.toLocaleString("en-US");
+  const base = `${req.protocol}://${req.get("host")}`;
+  const photoUrl = (name) => {
+    for (const ext of ["jpg", "jpeg", "png", "webp"]) {
+      if (fs.existsSync(path.join(IMG_DIR, `${name}.${ext}`))) return `${base}/images/${name}.${ext}`;
+    }
+    return undefined; // no file yet: the card shows without a photo
+  };
   // "items" are already in card shape, so the agent can show them as a carousel.
   res.json({
     count: list.length,
@@ -234,7 +253,7 @@ app.get("/equipment", (req, res) => {
       id: e.id,
       title: e.name,
       subtitle: `${money(e.price)} - ${e.hp} HP - ${e.use}`,
-      image: e.image,
+      image: e.image || photoUrl(e.photo),
     })),
   });
 });
